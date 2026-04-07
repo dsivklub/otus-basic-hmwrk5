@@ -1,6 +1,7 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
+#include <stdexcept>
 
 class IStatistics {
 public:
@@ -13,16 +14,21 @@ public:
 
 class Min : public IStatistics {
 public:
-	Min() : m_min{std::numeric_limits<double>::min()} {
+	Min() : m_min{std::numeric_limits<double>::max()} {
 	}
 
 	void update(double next) override {
 		if (next < m_min) {
 			m_min = next;
 		}
+		m_count++;
 	}
 
 	double eval() const override {
+		if (!m_count) {
+			throw std::invalid_argument("The sequence length must be greater than 0 \
+				to calculate min");
+		}
 		return m_min;
 	}
 
@@ -32,20 +38,26 @@ public:
 
 private:
 	double m_min;
+	unsigned int m_count{0};
 };
 
 class Max : public IStatistics {
 public:
-	Max() : m_max{std::numeric_limits<double>::min()} {
+	Max() : m_max{std::numeric_limits<double>::lowest()} {
 	}
 
 	void update(double next) override {
 		if (next > m_max) {
 			m_max = next;
 		}
+		m_count++;
 	}
 
 	double eval() const override {
+		if (!m_count) {
+			throw std::invalid_argument("The sequence length must be greater than 0 \
+				to calculate max");
+		}
 		return m_max;
 	}
 
@@ -55,6 +67,7 @@ public:
 
 private:
 	double m_max;
+	unsigned int m_count{0};
 };
 
 class Mean : public IStatistics {
@@ -67,6 +80,10 @@ public:
 	}
 
 	double eval() const override {
+		if (!m_num) {
+			throw std::invalid_argument("The sequence length must be greater than 0 \
+				to calculate mean");
+		}
 		return m_sum_prev / m_num;
 	}
 
@@ -85,17 +102,22 @@ private:
 
 class Std : public IStatistics {
 public:
-	Std(const Mean* meanStat):
-		m_meanStat{meanStat}
-		{};
+	Std() {
+		m_meanStat = Mean();
+	};
 
 	void update(double next) override {
+		m_meanStat.update(next);
 		m_sum_prev_sq += ((next * next));
 		m_num ++;
 	}
 
 	double eval() const override {
-		double mean = m_meanStat->eval();
+		if (!m_num) {
+			throw std::invalid_argument("The sequence length must be greater than 0 \
+				to calculate std");			
+		}
+		double mean = m_meanStat.eval();
 		return std::sqrt(m_sum_prev_sq / m_num - (mean * mean));
 	}
 
@@ -104,7 +126,7 @@ public:
 	}
 
 private:
-	const Mean* m_meanStat = nullptr;
+	Mean m_meanStat;
 	double m_sum_prev_sq{0.};
 	unsigned int m_num{0};
 	double m_std{0.};
@@ -120,7 +142,7 @@ int main() {
 	statistics[0] = new Min{};
 	statistics[1] = new Max{};
 	statistics[2] = new Mean{};
-	statistics[3] = new Std{dynamic_cast<Mean*>(statistics[2])};
+	statistics[3] = new Std{};
 
 	double val = 0;
 	while (std::cin >> val) {
